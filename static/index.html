@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ClawdBot Recruiter – AI Talent Finder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+
+<body>
+  <!-- ─── Background decoration ────────────────────────── -->
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+  <div class="bg-orb bg-orb-3"></div>
+
+  <!-- ─── Header ────────────────────────────────────────── -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">🤖</span>
+        <span class="logo-text">ClawdBot <span class="accent">Recruiter</span></span>
+      </div>
+      <div class="header-badge">AI Talent Finder</div>
+    </div>
+  </header>
+
+  <!-- ─── Main content ──────────────────────────────────── -->
+  <main class="main">
+    <!-- ── Search Panel ──────────────────────────────── -->
+    <section class="panel search-panel" id="searchPanel">
+      <div class="panel-header">
+        <h2 class="panel-title">
+          <span class="panel-icon">🔍</span>
+          Tìm kiếm ứng viên
+        </h2>
+        <p class="panel-subtitle">Nhập thông tin để bắt đầu quét các nền tảng</p>
+      </div>
+
+      <form id="searchForm" class="search-form">
+        <div class="form-group">
+          <label for="keywords">Từ khóa <span class="required">*</span></label>
+          <input type="text" id="keywords" placeholder="VD: 2D animator, concept artist" required />
+          <span class="form-hint">Phân tách nhiều từ khóa bằng dấu phẩy</span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="location">Vị trí / Quốc gia</label>
+            <input type="text" id="location" placeholder="VD: Vietnam, Japan, Germany" />
+          </div>
+          <div class="form-group">
+            <label for="maxItems">Số lượng tối đa / nền tảng</label>
+            <input type="number" id="maxItems" value="10" min="1" max="100" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Nền tảng</label>
+          <div class="platform-grid">
+            <label class="platform-card" data-platform="linkedin">
+              <input type="checkbox" name="platforms" value="linkedin" checked />
+              <div class="platform-card-inner">
+                <span class="platform-emoji">💼</span>
+                <span class="platform-name">LinkedIn</span>
+                <span class="platform-tag tag-api">Apify</span>
+              </div>
+            </label>
+            <label class="platform-card" data-platform="artstation">
+              <input type="checkbox" name="platforms" value="artstation" checked />
+              <div class="platform-card-inner">
+                <span class="platform-emoji">🎨</span>
+                <span class="platform-name">ArtStation</span>
+                <span class="platform-tag tag-free">FREE</span>
+              </div>
+            </label>
+            <label class="platform-card" data-platform="instagram">
+              <input type="checkbox" name="platforms" value="instagram" checked />
+              <div class="platform-card-inner">
+                <span class="platform-emoji">📸</span>
+                <span class="platform-name">Instagram</span>
+                <span class="platform-tag tag-api">Apify</span>
+              </div>
+            </label>
+            <label class="platform-card" data-platform="x">
+              <input type="checkbox" name="platforms" value="x" />
+              <div class="platform-card-inner">
+                <span class="platform-emoji">𝕏</span>
+                <span class="platform-name">Twitter / X</span>
+                <span class="platform-tag tag-free">FREE</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="btnSearch">
+          <span class="btn-icon">🚀</span>
+          Bắt đầu quét
+        </button>
+      </form>
+    </section>
+
+    <!-- ── Job Status Panel ──────────────────────────── -->
+    <section class="panel status-panel hidden" id="statusPanel">
+      <div class="panel-header">
+        <h2 class="panel-title">
+          <span class="panel-icon" id="statusIcon">⏳</span>
+          <span id="statusTitle">Đang quét...</span>
+        </h2>
+        <p class="panel-subtitle" id="statusSubtitle">Hệ thống đang tìm kiếm ứng viên trên các nền tảng</p>
+      </div>
+
+      <div class="progress-container" id="progressContainer">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-text" id="progressText">Đang khởi tạo...</div>
+      </div>
+
+      <div class="stats-row" id="statsRow">
+        <div class="stat-card">
+          <span class="stat-value" id="statCandidates">0</span>
+          <span class="stat-label">Ứng viên</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="statPlatforms">0</span>
+          <span class="stat-label">Nền tảng</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="statTime">0s</span>
+          <span class="stat-label">Thời gian</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Results Panel ─────────────────────────────── -->
+    <section class="panel results-panel hidden" id="resultsPanel">
+      <div class="panel-header">
+        <div class="panel-header-left">
+          <h2 class="panel-title">
+            <span class="panel-icon">📋</span>
+            Kết quả (<span id="resultCount">0</span>)
+          </h2>
+        </div>
+        <div class="panel-header-right">
+          <button class="btn btn-outline btn-sm" id="btnNewSearch">
+            <span class="btn-icon">🔄</span> Quét mới
+          </button>
+        </div>
+      </div>
+
+      <!-- Export section -->
+      <div class="export-section" id="exportSection">
+        <div class="export-form">
+          <input type="text" id="sheetId" placeholder="Google Sheet ID"
+            value="" />
+          <input type="text" id="tabName" placeholder="Tên Tab" value="" />
+          <button class="btn btn-success btn-sm" id="btnExport">
+            <span class="btn-icon">📊</span> Export Google Sheet
+          </button>
+        </div>
+        <div class="export-result hidden" id="exportResult"></div>
+      </div>
+
+      <!-- Filter / search -->
+      <div class="results-toolbar">
+        <input type="text" id="filterInput" placeholder="🔎 Lọc theo tên, vị trí, kỹ năng..." class="filter-input" />
+        <div class="view-toggle">
+          <button class="view-btn active" data-view="table" id="viewTable">☰</button>
+          <button class="view-btn" data-view="cards" id="viewCards">⊞</button>
+        </div>
+      </div>
+
+      <!-- Table view -->
+      <div class="table-container" id="tableView">
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tên</th>
+              <th>Chức danh</th>
+              <th>Vị trí</th>
+              <th>Nền tảng</th>
+              <th>Email</th>
+              <th>Links</th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+      </div>
+
+      <!-- Cards view -->
+      <div class="cards-container hidden" id="cardsView"></div>
+    </section>
+
+    <!-- ── History Panel ────────────────────────────── -->
+    <section class="panel history-panel" id="historyPanel">
+      <div class="panel-header">
+        <h2 class="panel-title">
+          <span class="panel-icon">📜</span>
+          Lịch sử quét
+        </h2>
+      </div>
+      <div class="history-list" id="historyList">
+        <p class="empty-state">Chưa có lịch sử quét nào</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- ─── Toast notification ────────────────────────── -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+
+</html>

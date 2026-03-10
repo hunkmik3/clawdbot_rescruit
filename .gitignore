@@ -1,0 +1,24 @@
+# Secrets
+.env
+service_account.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Data (job results)
+data/jobs/
+
+# Debug / test artifacts
+*.log
+*.png
+data/elonmusk/
+
+# Claude Code
+.claude/
+
+# OS
+.DS_Store
