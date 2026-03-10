@@ -1,29 +1,26 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ClawdBot Recruiter – AI Talent Finder</title>
+  <title>Otsulabs Recruiter – AI Talent Finder</title>
+  <link rel="icon" type="image/svg+xml" href="/static/Otsu_Logo_black.svg?v=20260311-logo" />
+  <link rel="shortcut icon" href="/static/Otsu_Logo_black.svg?v=20260311-logo" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&display=swap"
     rel="stylesheet" />
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/style.css?v=20260311-logo-assets" />
 </head>
 
 <body>
-  <!-- ─── Background decoration ────────────────────────── -->
-  <div class="bg-orb bg-orb-1"></div>
-  <div class="bg-orb bg-orb-2"></div>
-  <div class="bg-orb bg-orb-3"></div>
-
   <!-- ─── Header ────────────────────────────────────────── -->
   <header class="header">
     <div class="header-inner">
       <div class="logo">
-        <span class="logo-icon">🤖</span>
-        <span class="logo-text">ClawdBot <span class="accent">Recruiter</span></span>
+        <img src="/static/Otsu_Logo_white.png?v=20260311-logo" alt="Otsu Labs logo" class="logo-image" />
+        <span class="logo-text">Otsulabs <span class="accent">Recruiter</span></span>
       </div>
       <div class="header-badge">AI Talent Finder</div>
     </div>
@@ -36,31 +33,34 @@
       <div class="panel-header">
         <h2 class="panel-title">
           <span class="panel-icon">🔍</span>
-          Tìm kiếm ứng viên
+          Find Candidates
         </h2>
-        <p class="panel-subtitle">Nhập thông tin để bắt đầu quét các nền tảng</p>
+        <p class="panel-subtitle">Enter search criteria to start scanning platforms</p>
       </div>
 
       <form id="searchForm" class="search-form">
         <div class="form-group">
-          <label for="keywords">Từ khóa <span class="required">*</span></label>
-          <input type="text" id="keywords" placeholder="VD: 2D animator, concept artist" required />
-          <span class="form-hint">Phân tách nhiều từ khóa bằng dấu phẩy</span>
+          <label for="keywords">Keywords <span class="required">*</span></label>
+          <input type="text" id="keywords" placeholder="e.g. 2D animator, concept artist" required />
+          <span class="form-hint">Separate multiple keywords with commas</span>
         </div>
 
         <div class="form-row">
           <div class="form-group">
-            <label for="location">Vị trí / Quốc gia</label>
-            <input type="text" id="location" placeholder="VD: Vietnam, Japan, Germany" />
+            <label for="location">Location / Country</label>
+            <select id="location">
+              <option value="">All countries</option>
+            </select>
+            <span class="form-hint">Choose a country from the list to avoid typos</span>
           </div>
           <div class="form-group">
-            <label for="maxItems">Số lượng tối đa / nền tảng</label>
+            <label for="maxItems">Max results / platform</label>
             <input type="number" id="maxItems" value="10" min="1" max="100" />
           </div>
         </div>
 
         <div class="form-group">
-          <label>Nền tảng</label>
+          <label>Platforms</label>
           <div class="platform-grid">
             <label class="platform-card" data-platform="linkedin">
               <input type="checkbox" name="platforms" value="linkedin" checked />
@@ -87,7 +87,7 @@
               </div>
             </label>
             <label class="platform-card" data-platform="x">
-              <input type="checkbox" name="platforms" value="x" />
+              <input type="checkbox" name="platforms" value="x" checked />
               <div class="platform-card-inner">
                 <span class="platform-emoji">𝕏</span>
                 <span class="platform-name">Twitter / X</span>
@@ -99,7 +99,7 @@
 
         <button type="submit" class="btn btn-primary" id="btnSearch">
           <span class="btn-icon">🚀</span>
-          Bắt đầu quét
+          Start Scan
         </button>
       </form>
     </section>
@@ -109,30 +109,30 @@
       <div class="panel-header">
         <h2 class="panel-title">
           <span class="panel-icon" id="statusIcon">⏳</span>
-          <span id="statusTitle">Đang quét...</span>
+          <span id="statusTitle">Scanning...</span>
         </h2>
-        <p class="panel-subtitle" id="statusSubtitle">Hệ thống đang tìm kiếm ứng viên trên các nền tảng</p>
+        <p class="panel-subtitle" id="statusSubtitle">The system is searching for candidates across platforms</p>
       </div>
 
       <div class="progress-container" id="progressContainer">
         <div class="progress-bar">
           <div class="progress-fill" id="progressFill"></div>
         </div>
-        <div class="progress-text" id="progressText">Đang khởi tạo...</div>
+        <div class="progress-text" id="progressText">Initializing...</div>
       </div>
 
       <div class="stats-row" id="statsRow">
         <div class="stat-card">
           <span class="stat-value" id="statCandidates">0</span>
-          <span class="stat-label">Ứng viên</span>
+          <span class="stat-label">Candidates</span>
         </div>
         <div class="stat-card">
           <span class="stat-value" id="statPlatforms">0</span>
-          <span class="stat-label">Nền tảng</span>
+          <span class="stat-label">Platforms</span>
         </div>
         <div class="stat-card">
           <span class="stat-value" id="statTime">0s</span>
-          <span class="stat-label">Thời gian</span>
+          <span class="stat-label">Time</span>
         </div>
       </div>
     </section>
@@ -143,22 +143,22 @@
         <div class="panel-header-left">
           <h2 class="panel-title">
             <span class="panel-icon">📋</span>
-            Kết quả (<span id="resultCount">0</span>)
+            Results (<span id="resultCount">0</span>)
           </h2>
         </div>
         <div class="panel-header-right">
           <button class="btn btn-outline btn-sm" id="btnNewSearch">
-            <span class="btn-icon">🔄</span> Quét mới
+            <span class="btn-icon">🔄</span> New Scan
           </button>
         </div>
       </div>
 
       <!-- Export section -->
-      <div class="export-section" id="exportSection">
+      <div class="export-section hidden" id="exportSection">
         <div class="export-form">
           <input type="text" id="sheetId" placeholder="Google Sheet ID"
             value="" />
-          <input type="text" id="tabName" placeholder="Tên Tab" value="" />
+          <input type="text" id="tabName" placeholder="Tab Name" value="" />
           <button class="btn btn-success btn-sm" id="btnExport">
             <span class="btn-icon">📊</span> Export Google Sheet
           </button>
@@ -168,7 +168,7 @@
 
       <!-- Filter / search -->
       <div class="results-toolbar">
-        <input type="text" id="filterInput" placeholder="🔎 Lọc theo tên, vị trí, kỹ năng..." class="filter-input" />
+        <input type="text" id="filterInput" placeholder="🔎 Filter by name, location, skills..." class="filter-input" />
         <div class="view-toggle">
           <button class="view-btn active" data-view="table" id="viewTable">☰</button>
           <button class="view-btn" data-view="cards" id="viewCards">⊞</button>
@@ -181,10 +181,12 @@
           <thead>
             <tr>
               <th>#</th>
-              <th>Tên</th>
-              <th>Chức danh</th>
-              <th>Vị trí</th>
-              <th>Nền tảng</th>
+              <th>Name</th>
+              <th>Title</th>
+              <th>Location</th>
+              <th>Platform</th>
+              <th>Followers</th>
+              <th>Cross-platform Enrich</th>
               <th>Email</th>
               <th>Links</th>
             </tr>
@@ -202,11 +204,11 @@
       <div class="panel-header">
         <h2 class="panel-title">
           <span class="panel-icon">📜</span>
-          Lịch sử quét
+          Scan History
         </h2>
       </div>
       <div class="history-list" id="historyList">
-        <p class="empty-state">Chưa có lịch sử quét nào</p>
+        <p class="empty-state">No scan history yet</p>
       </div>
     </section>
   </main>
@@ -214,7 +216,7 @@
   <!-- ─── Toast notification ────────────────────────── -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=20260311-en-ui"></script>
 </body>
 
 </html>

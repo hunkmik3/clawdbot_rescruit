@@ -114,6 +114,36 @@ def _normalize_artstation(item: dict[str, Any], platform: str) -> Candidate:
     if source_url and "artstation.com" in source_url:
         artstation_url = source_url
 
+    # Extract cross-platform links
+    linkedin_url = first_non_empty(item, ["linkedin_url"])
+    x_url = first_non_empty(item, ["x_url"])
+    instagram_url = first_non_empty(item, ["instagram_url"])
+    portfolio_url = first_non_empty(item, ["portfolio_url"])
+    behance_url = first_non_empty(item, ["behance_url"])
+
+    # Skills & software from enriched data
+    skills_raw = item.get("skills") or []
+    skills = []
+    for s in skills_raw:
+        if isinstance(s, str):
+            skills.append(s)
+        elif isinstance(s, dict) and s.get("name"):
+            skills.append(s["name"])
+
+    software_raw = item.get("software_items") or item.get("software") or []
+    software = []
+    for s in software_raw:
+        if isinstance(s, str):
+            software.append(s)
+        elif isinstance(s, dict) and s.get("name"):
+            software.append(s["name"])
+
+    # Work samples from top_works
+    top_works = item.get("top_works") or []
+    work_samples = []
+    for tw_url in top_works[:5]:
+        work_samples.append(WorkSample(url=tw_url))
+
     return Candidate(
         full_name=full_name,
         title=job_title,
@@ -121,6 +151,16 @@ def _normalize_artstation(item: dict[str, Any], platform: str) -> Candidate:
         location=location,
         email=email,
         artstation_url=artstation_url,
+        linkedin_url=linkedin_url,
+        x_url=x_url,
+        instagram_url=instagram_url,
+        portfolio_url=portfolio_url,
+        behance_url=behance_url,
+        skills=skills,
+        software=software,
+        top_works=top_works,
+        work_samples=work_samples,
+        followers_count=_safe_int(item.get("followers_count")),
         experience_summary=description,
         source_platform=platform,
         source_url=source_url,
@@ -305,13 +345,49 @@ def _normalize_linkedin(item: dict[str, Any], platform: str) -> Candidate:
                     entry = f"{degree} @ {school}"
                 notable_projects.append(entry)
 
+    # ── Cross-platform links (from about text, websites, etc.)
+    about_text = first_non_empty(item, ["about", "summary", "bio"]) or ""
+    li, x_url, ig, portfolio = _extract_links({"bio": about_text})
+
+    # Check about text for artstation/behance links
+    import re
+    artstation_url = None
+    behance_url = None
+    if about_text:
+        m = re.search(r"artstation\.com/([a-zA-Z0-9_.-]+)", about_text.lower())
+        if m and m.group(1) not in ("artwork", "search"):
+            artstation_url = f"https://www.artstation.com/{m.group(1)}"
+        m = re.search(r"behance\.net/([a-zA-Z0-9_.-]+)", about_text.lower())
+        if m:
+            behance_url = f"https://www.behance.net/{m.group(1)}"
+
+    # Also check websites field
+    websites = item.get("websites") or item.get("website") or []
+    if isinstance(websites, str):
+        websites = [websites]
+    for w in websites:
+        url = w.get("url") if isinstance(w, dict) else w
+        if isinstance(url, str):
+            url_lower = url.lower()
+            if "artstation" in url_lower and not artstation_url:
+                artstation_url = url
+            elif "behance" in url_lower and not behance_url:
+                behance_url = url
+            elif not portfolio:
+                portfolio = url
+
     return Candidate(
         full_name=full_name,
         title=headline,
-        bio=first_non_empty(item, ["about", "summary", "bio"]),
+        bio=about_text or None,
         location=location,
         email=email,
         linkedin_url=profile_url,
+        x_url=x_url,
+        instagram_url=ig,
+        artstation_url=artstation_url,
+        behance_url=behance_url,
+        portfolio_url=portfolio,
         current_company=current_company_name,
         previous_companies=previous_companies[:5],
         notable_projects=notable_projects[:3],

@@ -10,6 +10,7 @@ from typing import Any
 
 from app.models.schemas import Candidate
 from app.services.apify_client import ApifyClient
+from app.services.cross_platform import enrich_candidates_cross_platform
 from app.services.job_store import load_job, save_job, update_job_status
 from app.services.normalize import normalize_candidate
 
@@ -303,8 +304,20 @@ def run_job(job_id: str) -> None:
 
     try:
         deduped = _dedupe_candidates(all_candidates)
+
+        # Cross-platform enrichment: fetch linked profiles from other platforms
+        enriched, enrichment_stats = enrich_candidates_cross_platform(
+            deduped, platforms
+        )
+        if enrichment_stats["total_enriched"] > 0:
+            outputs["cross_platform_enrichment"] = enrichment_stats
+            logger.info(
+                f"[Pipeline] Cross-platform enrichment: "
+                f"{enrichment_stats['total_enriched']} candidates enriched"
+            )
+
         data["outputs"] = outputs
-        data["candidates"] = [candidate.model_dump() for candidate in deduped]
+        data["candidates"] = [candidate.model_dump() for candidate in enriched]
         data["status"] = "succeeded"
         data["error"] = None
         save_job(job_id, data)

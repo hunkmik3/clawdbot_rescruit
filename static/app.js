@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════
-   ClawdBot Recruiter – App Logic
+   Otsulabs Recruiter – App Logic
    ═══════════════════════════════════════════════════ */
 
 const API = '';  // same origin
@@ -9,6 +9,214 @@ let currentJobId = null;
 let pollTimer = null;
 let startTime = null;
 let candidates = [];
+const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig;
+const EMAIL_BLOCKLIST_PREFIXES = ['noreply@', 'no-reply@', 'donotreply@', 'example@', 'test@'];
+const CROSS_PLATFORM_LABELS = {
+    artstation: 'ArtStation',
+    x: 'X/Twitter',
+    twitter: 'X/Twitter',
+    linkedin: 'LinkedIn',
+    instagram: 'Instagram',
+    behance: 'Behance',
+};
+const COUNTRY_LIST = [
+    "Afghanistan",
+    "Albania",
+    "Algeria",
+    "Andorra",
+    "Angola",
+    "Antigua and Barbuda",
+    "Argentina",
+    "Armenia",
+    "Australia",
+    "Austria",
+    "Azerbaijan",
+    "Bahamas",
+    "Bahrain",
+    "Bangladesh",
+    "Barbados",
+    "Belarus",
+    "Belgium",
+    "Belize",
+    "Benin",
+    "Bhutan",
+    "Bolivia",
+    "Bosnia and Herzegovina",
+    "Botswana",
+    "Brazil",
+    "Brunei",
+    "Bulgaria",
+    "Burkina Faso",
+    "Burundi",
+    "Cabo Verde",
+    "Cambodia",
+    "Cameroon",
+    "Canada",
+    "Central African Republic",
+    "Chad",
+    "Chile",
+    "China",
+    "Colombia",
+    "Comoros",
+    "Congo",
+    "Costa Rica",
+    "Cote d'Ivoire",
+    "Croatia",
+    "Cuba",
+    "Cyprus",
+    "Czechia",
+    "Democratic Republic of the Congo",
+    "Denmark",
+    "Djibouti",
+    "Dominica",
+    "Dominican Republic",
+    "Ecuador",
+    "Egypt",
+    "El Salvador",
+    "Equatorial Guinea",
+    "Eritrea",
+    "Estonia",
+    "Eswatini",
+    "Ethiopia",
+    "Fiji",
+    "Finland",
+    "France",
+    "Gabon",
+    "Gambia",
+    "Georgia",
+    "Germany",
+    "Ghana",
+    "Greece",
+    "Grenada",
+    "Guatemala",
+    "Guinea",
+    "Guinea-Bissau",
+    "Guyana",
+    "Haiti",
+    "Honduras",
+    "Hungary",
+    "Iceland",
+    "India",
+    "Indonesia",
+    "Iran",
+    "Iraq",
+    "Ireland",
+    "Israel",
+    "Italy",
+    "Jamaica",
+    "Japan",
+    "Jordan",
+    "Kazakhstan",
+    "Kenya",
+    "Kiribati",
+    "Kuwait",
+    "Kyrgyzstan",
+    "Laos",
+    "Latvia",
+    "Lebanon",
+    "Lesotho",
+    "Liberia",
+    "Libya",
+    "Liechtenstein",
+    "Lithuania",
+    "Luxembourg",
+    "Madagascar",
+    "Malawi",
+    "Malaysia",
+    "Maldives",
+    "Mali",
+    "Malta",
+    "Marshall Islands",
+    "Mauritania",
+    "Mauritius",
+    "Mexico",
+    "Micronesia",
+    "Moldova",
+    "Monaco",
+    "Mongolia",
+    "Montenegro",
+    "Morocco",
+    "Mozambique",
+    "Myanmar",
+    "Namibia",
+    "Nauru",
+    "Nepal",
+    "Netherlands",
+    "New Zealand",
+    "Nicaragua",
+    "Niger",
+    "Nigeria",
+    "North Korea",
+    "North Macedonia",
+    "Norway",
+    "Oman",
+    "Pakistan",
+    "Palau",
+    "Palestine",
+    "Panama",
+    "Papua New Guinea",
+    "Paraguay",
+    "Peru",
+    "Philippines",
+    "Poland",
+    "Portugal",
+    "Qatar",
+    "Romania",
+    "Russia",
+    "Rwanda",
+    "Saint Kitts and Nevis",
+    "Saint Lucia",
+    "Saint Vincent and the Grenadines",
+    "Samoa",
+    "San Marino",
+    "Sao Tome and Principe",
+    "Saudi Arabia",
+    "Senegal",
+    "Serbia",
+    "Seychelles",
+    "Sierra Leone",
+    "Singapore",
+    "Slovakia",
+    "Slovenia",
+    "Solomon Islands",
+    "Somalia",
+    "South Africa",
+    "South Korea",
+    "South Sudan",
+    "Spain",
+    "Sri Lanka",
+    "Sudan",
+    "Suriname",
+    "Sweden",
+    "Switzerland",
+    "Syria",
+    "Taiwan",
+    "Tajikistan",
+    "Tanzania",
+    "Thailand",
+    "Timor-Leste",
+    "Togo",
+    "Tonga",
+    "Trinidad and Tobago",
+    "Tunisia",
+    "Turkey",
+    "Turkmenistan",
+    "Tuvalu",
+    "Uganda",
+    "Ukraine",
+    "United Arab Emirates",
+    "United Kingdom",
+    "United States",
+    "Uruguay",
+    "Uzbekistan",
+    "Vanuatu",
+    "Vatican City",
+    "Venezuela",
+    "Vietnam",
+    "Yemen",
+    "Zambia",
+    "Zimbabwe",
+];
 
 // ── DOM refs ───────────────────────────────────────
 const $ = (sel) => document.querySelector(sel);
@@ -21,6 +229,7 @@ const historyPanel = $('#historyPanel');
 
 // ── Init ───────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+    initCountrySelector();
     loadHistory();
 
     // Search form
@@ -40,6 +249,20 @@ document.addEventListener('DOMContentLoaded', () => {
     $('#viewCards').addEventListener('click', () => setView('cards'));
 });
 
+function initCountrySelector() {
+    const locationSelect = $('#location');
+    if (!locationSelect) return;
+
+    const fragment = document.createDocumentFragment();
+    COUNTRY_LIST.forEach(country => {
+        const option = document.createElement('option');
+        option.value = country;
+        option.textContent = country;
+        fragment.appendChild(option);
+    });
+    locationSelect.appendChild(fragment);
+}
+
 
 // ═══ Search ════════════════════════════════════════
 async function handleSearch(e) {
@@ -55,7 +278,7 @@ async function handleSearch(e) {
     const platforms = [];
     $$('input[name="platforms"]:checked').forEach(cb => platforms.push(cb.value));
     if (platforms.length === 0) {
-        toast('Vui lòng chọn ít nhất 1 nền tảng', 'error');
+        toast('Please select at least one platform', 'error');
         return;
     }
 
@@ -69,7 +292,7 @@ async function handleSearch(e) {
     // Disable button
     const btn = $('#btnSearch');
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Đang tạo job...';
+    btn.innerHTML = '<span class="spinner"></span> Creating job...';
 
     try {
         const resp = await fetch(`${API}/jobs`, {
@@ -80,9 +303,9 @@ async function handleSearch(e) {
         const data = await resp.json();
 
         if (!resp.ok) {
-            toast(data.detail || 'Lỗi tạo job', 'error');
+            toast(data.detail || 'Failed to create job', 'error');
             btn.disabled = false;
-            btn.innerHTML = '<span class="btn-icon">🚀</span> Bắt đầu quét';
+            btn.innerHTML = '<span class="btn-icon">🚀</span> Start Scan';
             return;
         }
 
@@ -90,21 +313,21 @@ async function handleSearch(e) {
         startTime = Date.now();
 
         // Auto-generate tab name
-        const tabName = `${keywords[0]} ${location || ''} ${new Date().toLocaleDateString('vi')}`.trim();
+        const tabName = `${keywords[0]} ${location || ''} ${new Date().toLocaleDateString('en-US')}`.trim();
         $('#tabName').value = tabName;
 
         // Show status panel
         showStatusPanel(platforms.length);
         startPolling();
 
-        toast('Job đã được tạo! Đang quét...', 'info');
+        toast('Job created. Scanning...', 'info');
 
     } catch (err) {
-        toast(`Lỗi kết nối server: ${err.message}`, 'error');
+        toast(`Server connection error: ${err.message}`, 'error');
     }
 
     btn.disabled = false;
-    btn.innerHTML = '<span class="btn-icon">🚀</span> Bắt đầu quét';
+    btn.innerHTML = '<span class="btn-icon">🚀</span> Start Scan';
 }
 
 
@@ -134,17 +357,17 @@ async function pollStatus() {
         if (data.status === 'running') {
             const progress = Math.min(90, (elapsed / 180) * 90);
             $('#progressFill').style.width = `${progress}%`;
-            $('#progressText').textContent = `Đang quét... đã tìm thấy ${data.candidate_count} ứng viên`;
+            $('#progressText').textContent = `Scanning... found ${data.candidate_count} candidates`;
         }
         else if (data.status === 'succeeded') {
             stopPolling();
             $('#progressFill').style.width = '100%';
-            $('#progressText').textContent = `Hoàn thành! ${data.candidate_count} ứng viên`;
+            $('#progressText').textContent = `Completed! ${data.candidate_count} candidates`;
             $('#statusIcon').textContent = '✅';
-            $('#statusTitle').textContent = 'Quét hoàn tất!';
-            $('#statusSubtitle').textContent = `Tìm thấy ${data.candidate_count} ứng viên trên các nền tảng`;
+            $('#statusTitle').textContent = 'Scan Completed!';
+            $('#statusSubtitle').textContent = `Found ${data.candidate_count} candidates across platforms`;
 
-            toast(`Tìm thấy ${data.candidate_count} ứng viên!`, 'success');
+            toast(`Found ${data.candidate_count} candidates!`, 'success');
 
             // Load results
             await loadResults();
@@ -154,11 +377,11 @@ async function pollStatus() {
             stopPolling();
             $('#progressFill').style.width = '100%';
             $('#progressFill').style.background = 'var(--danger)';
-            $('#progressText').textContent = `Lỗi: ${data.error || 'Unknown error'}`;
+            $('#progressText').textContent = `Error: ${data.error || 'Unknown error'}`;
             $('#statusIcon').textContent = '❌';
-            $('#statusTitle').textContent = 'Quét thất bại';
-            $('#statusSubtitle').textContent = data.error || 'Đã xảy ra lỗi';
-            toast('Job thất bại: ' + (data.error || '').substring(0, 80), 'error');
+            $('#statusTitle').textContent = 'Scan Failed';
+            $('#statusSubtitle').textContent = data.error || 'An error occurred';
+            toast('Job failed: ' + (data.error || '').substring(0, 80), 'error');
             loadHistory();
         }
 
@@ -175,7 +398,7 @@ async function loadResults() {
     try {
         const resp = await fetch(`${API}/jobs/${currentJobId}/results`);
         const data = await resp.json();
-        candidates = data.candidates || [];
+        candidates = sortCandidatesByFollowers(data.candidates || []);
 
         $('#resultCount').textContent = candidates.length;
 
@@ -186,37 +409,163 @@ async function loadResults() {
         resultsPanel.classList.remove('hidden');
 
     } catch (err) {
-        toast('Không thể tải kết quả', 'error');
+        toast('Unable to load results', 'error');
     }
+}
+
+function buildSocialLinks(c) {
+    const links = [];
+    if (c.linkedin_url) links.push(`<a href="${c.linkedin_url}" target="_blank" class="link-pill">LinkedIn</a>`);
+    if (c.artstation_url) links.push(`<a href="${c.artstation_url}" target="_blank" class="link-pill">ArtStation</a>`);
+    if (c.x_url) links.push(`<a href="${c.x_url}" target="_blank" class="link-pill">X/Twitter</a>`);
+    if (c.instagram_url) links.push(`<a href="${c.instagram_url}" target="_blank" class="link-pill">Instagram</a>`);
+    if (c.behance_url) links.push(`<a href="${c.behance_url}" target="_blank" class="link-pill">Behance</a>`);
+    if (c.portfolio_url) links.push(`<a href="${c.portfolio_url}" target="_blank" class="link-pill">Portfolio</a>`);
+    if (c.source_url && !links.some(l => l.includes(c.source_url))) {
+        links.push(`<a href="${c.source_url}" target="_blank" class="link-pill">Profile</a>`);
+    }
+    return links;
+}
+
+function buildSkillTags(c) {
+    const skills = c.skills || [];
+    const software = c.software || [];
+    const all = [...skills.slice(0, 5), ...software.slice(0, 3)];
+    if (!all.length) return '';
+    return `<div class="skill-tags">${all.map(s => `<span class="skill-tag">${esc(s)}</span>`).join('')}</div>`;
+}
+
+function hasCrossPlatformData(c) {
+    return c.raw?.cross_platform && Object.keys(c.raw.cross_platform).length > 0;
+}
+
+function getFollowerCount(c) {
+    const value = Number(c?.followers_count);
+    if (!Number.isFinite(value) || value < 0) return null;
+    return Math.round(value);
+}
+
+function getCrossPlatformSummary(c) {
+    const raw = c?.raw?.cross_platform;
+    if (!raw || typeof raw !== 'object') {
+        return { count: 0, labels: [] };
+    }
+    const labels = Object.keys(raw)
+        .filter(Boolean)
+        .map(key => CROSS_PLATFORM_LABELS[key.toLowerCase()] || key);
+    return { count: labels.length, labels };
+}
+
+function getValueByPath(obj, path) {
+    return path.split('.').reduce((acc, key) => (acc && typeof acc === 'object' ? acc[key] : undefined), obj);
+}
+
+function isValidEmail(email) {
+    if (typeof email !== 'string') return false;
+    const normalized = email.trim().toLowerCase();
+    if (!normalized) return false;
+    if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(normalized)) return false;
+    return !EMAIL_BLOCKLIST_PREFIXES.some(prefix => normalized.startsWith(prefix));
+}
+
+function extractEmailsFromText(text) {
+    if (typeof text !== 'string' || !text.trim()) return [];
+    const matches = text.match(EMAIL_REGEX) || [];
+    return matches.filter(isValidEmail);
+}
+
+function resolveCandidateEmail(c) {
+    const structuredPaths = [
+        'email',
+        'raw.public_email',
+        'raw.email',
+        'raw.contactEmail',
+        'raw.emailAddress',
+        'raw.profile.public_email',
+        'raw.profile.email',
+        'raw.profile.contact_email',
+        'raw.user.email',
+    ];
+
+    for (const path of structuredPaths) {
+        const value = getValueByPath(c, path);
+        if (typeof value === 'string' && isValidEmail(value)) {
+            return { email: value.trim(), confidence: 'exact' };
+        }
+    }
+
+    const textSources = [
+        c?.bio,
+        c?.title,
+        getValueByPath(c, 'raw.description'),
+        getValueByPath(c, 'raw.summary'),
+        getValueByPath(c, 'raw.profile.summary'),
+        getValueByPath(c, 'raw.profile.headline'),
+        getValueByPath(c, 'raw.user.description'),
+    ];
+
+    for (const source of textSources) {
+        const found = extractEmailsFromText(source);
+        if (found.length > 0) {
+            return { email: found[0], confidence: 'inferred' };
+        }
+    }
+
+    return { email: '', confidence: 'none' };
+}
+
+function sortCandidatesByFollowers(items) {
+    return [...items].sort((a, b) => {
+        const fb = getFollowerCount(b) ?? -1;
+        const fa = getFollowerCount(a) ?? -1;
+        return fb - fa;
+    });
 }
 
 function renderTable(items) {
     const tbody = $('#resultsBody');
     tbody.innerHTML = '';
+    const topFollower = Math.max(...items.map(getFollowerCount).filter(v => v !== null), 0);
 
     items.forEach((c, i) => {
-        const links = [];
-        if (c.linkedin_url) links.push(`<a href="${c.linkedin_url}" target="_blank" class="link-pill">LinkedIn</a>`);
-        if (c.artstation_url) links.push(`<a href="${c.artstation_url}" target="_blank" class="link-pill">ArtStation</a>`);
-        if (c.instagram_url) links.push(`<a href="${c.instagram_url}" target="_blank" class="link-pill">Instagram</a>`);
-        if (c.portfolio_url) links.push(`<a href="${c.portfolio_url}" target="_blank" class="link-pill">Portfolio</a>`);
-        if (c.source_url && !links.some(l => l.includes(c.source_url))) {
-            links.push(`<a href="${c.source_url}" target="_blank" class="link-pill">Profile</a>`);
-        }
-
+        const links = buildSocialLinks(c);
         const platformClass = (c.source_platform || '').toLowerCase();
         const isTwitter = platformClass === 'x';
+        const enriched = hasCrossPlatformData(c);
+        const enrich = getCrossPlatformSummary(c);
+        const email = resolveCandidateEmail(c);
+        const followerCount = getFollowerCount(c);
+        const isTopFollower = followerCount !== null && followerCount > 0 && followerCount === topFollower;
+        const linkCount = [c.linkedin_url, c.artstation_url, c.x_url, c.instagram_url, c.behance_url, c.portfolio_url].filter(Boolean).length;
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
       <td style="color:var(--text-muted)">${i + 1}</td>
-      <td><strong>${esc(c.full_name || 'N/A')}</strong></td>
+      <td>
+        <strong>${esc(c.full_name || 'N/A')}</strong>
+        ${enriched ? '<span class="enriched-badge" title="Cross-platform enriched">+</span>' : ''}
+      </td>
       <td style="max-width:200px;color:var(--text-secondary)">${esc((c.title || '').substring(0, 60))}</td>
       <td style="color:var(--text-secondary)">${esc(c.location || '')}</td>
       <td>
         <span class="platform-badge ${platformClass}">${esc(c.source_platform || '')}</span>
+        ${linkCount > 1 ? `<span class="link-count" title="${linkCount} platforms">${linkCount}</span>` : ''}
       </td>
-      <td>${c.email ? `<span class="email-text">${esc(c.email)}</span>` : '<span style="color:var(--text-muted)">—</span>'}</td>
+      <td class="followers-cell">
+        ${followerCount !== null ? `<span>${followerCount.toLocaleString()}</span>${isTopFollower ? '<span class="followers-top-badge" title="Highest followers">TOP</span>' : ''}` : '<span style="color:var(--text-muted)">—</span>'}
+      </td>
+      <td class="enrich-cell">
+        ${enrich.count > 0
+                ? `<div class="enrich-chip-wrap">${enrich.labels.map(label => `<span class="enrich-chip">${esc(label)}</span>`).join('')}</div>`
+                : '<span class="enrich-none">—</span>'
+            }
+      </td>
+      <td>
+        ${email.email
+                ? `<div class="email-cell"><span class="email-text">${esc(email.email)}</span><span class="email-source ${email.confidence}">${email.confidence === 'exact' ? 'exact' : 'from bio'}</span></div>`
+                : '<span style="color:var(--text-muted)">—</span>'
+            }
+      </td>
       <td>
         <div class="link-pills">
           ${links.join('')}
@@ -231,29 +580,44 @@ function renderTable(items) {
 function renderCards(items) {
     const container = $('#cardsView');
     container.innerHTML = '';
+    const topFollower = Math.max(...items.map(getFollowerCount).filter(v => v !== null), 0);
 
     items.forEach(c => {
         const links = [];
         if (c.linkedin_url) links.push(`<a href="${c.linkedin_url}" target="_blank" class="link-pill">💼 LinkedIn</a>`);
         if (c.artstation_url) links.push(`<a href="${c.artstation_url}" target="_blank" class="link-pill">🎨 ArtStation</a>`);
+        if (c.x_url) links.push(`<a href="${c.x_url}" target="_blank" class="link-pill">🐦 X/Twitter</a>`);
         if (c.instagram_url) links.push(`<a href="${c.instagram_url}" target="_blank" class="link-pill">📸 Instagram</a>`);
+        if (c.behance_url) links.push(`<a href="${c.behance_url}" target="_blank" class="link-pill">🅱️ Behance</a>`);
         if (c.portfolio_url) links.push(`<a href="${c.portfolio_url}" target="_blank" class="link-pill">🌐 Portfolio</a>`);
 
         const platformClass = (c.source_platform || '').toLowerCase();
         const isTwitter = platformClass === 'x';
+        const enriched = hasCrossPlatformData(c);
+        const skillsHtml = buildSkillTags(c);
+        const enrich = getCrossPlatformSummary(c);
+        const email = resolveCandidateEmail(c);
+        const followerCount = getFollowerCount(c);
+        const isTopFollower = followerCount !== null && followerCount > 0 && followerCount === topFollower;
 
         const card = document.createElement('div');
         card.className = 'candidate-card';
         card.innerHTML = `
       <div class="candidate-card-header">
         <div>
-          <div class="candidate-name">${esc(c.full_name || 'N/A')}</div>
+          <div class="candidate-name">
+            ${esc(c.full_name || 'N/A')}
+            ${enriched ? '<span class="enriched-badge" title="Cross-platform enriched">+</span>' : ''}
+          </div>
           <div class="candidate-title">${esc(c.title || c.bio || '')}</div>
           ${c.location ? `<div class="candidate-location">${esc(c.location)}</div>` : ''}
         </div>
         <span class="platform-badge ${platformClass}">${esc(c.source_platform || '')}</span>
       </div>
-      ${c.email ? `<div class="email-text" style="margin-bottom:8px">📧 ${esc(c.email)}</div>` : ''}
+      ${email.email ? `<div class="card-metric-line">📧 <span class="email-text">${esc(email.email)}</span><span class="email-source ${email.confidence}">${email.confidence === 'exact' ? 'exact' : 'from bio'}</span></div>` : ''}
+      ${followerCount !== null ? `<div class="card-metric-line">👥 ${followerCount.toLocaleString()} followers ${isTopFollower ? '<span class="followers-top-badge">TOP</span>' : ''}</div>` : ''}
+      <div class="card-metric-line">🔀 Enrich: ${enrich.count > 0 ? enrich.labels.map(label => `<span class="enrich-chip">${esc(label)}</span>`).join('') : '<span class="enrich-none">—</span>'}</div>
+      ${skillsHtml}
       <div class="candidate-meta">
         ${links.join('')}
         ${isTwitter ? `<button onclick="handleDeepScan('${esc(c.raw?.user?.screen_name || '')}')" class="link-pill deep-scan-pill">🔍 Connects</button>` : ''}
@@ -274,12 +638,25 @@ function handleFilter() {
     }
 
     const filtered = candidates.filter(c => {
-        const text = [c.full_name, c.title, c.location, c.email, c.source_platform, c.bio, ...(c.skills || [])].join(' ').toLowerCase();
+        const enrich = getCrossPlatformSummary(c);
+        const email = resolveCandidateEmail(c);
+        const text = [
+            c.full_name,
+            c.title,
+            c.location,
+            email.email,
+            c.source_platform,
+            c.bio,
+            ...(c.skills || []),
+            ...(enrich.labels || []),
+            String(getFollowerCount(c) ?? ''),
+        ].join(' ').toLowerCase();
         return text.includes(query);
     });
 
-    renderTable(filtered);
-    renderCards(filtered);
+    const sortedFiltered = sortCandidatesByFollowers(filtered);
+    renderTable(sortedFiltered);
+    renderCards(sortedFiltered);
 }
 
 
@@ -291,13 +668,13 @@ async function handleExport() {
     const tabName = $('#tabName').value.trim() || 'Candidates';
 
     if (!sheetId) {
-        toast('Vui lòng nhập Google Sheet ID', 'error');
+        toast('Please enter a Google Sheet ID', 'error');
         return;
     }
 
     const btn = $('#btnExport');
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Đang export...';
+    btn.innerHTML = '<span class="spinner"></span> Exporting...';
 
     try {
         const resp = await fetch(`${API}/jobs/${currentJobId}/export`, {
@@ -312,16 +689,16 @@ async function handleExport() {
 
         if (resp.ok) {
             resultEl.className = 'export-result success';
-            resultEl.innerHTML = `✅ Đã export <strong>${data.exported_count}</strong> ứng viên! <a href="${data.sheet_url}" target="_blank" style="color:var(--success)">Mở Google Sheet →</a>`;
-            toast('Export thành công!', 'success');
+            resultEl.innerHTML = `✅ Exported <strong>${data.exported_count}</strong> candidates! <a href="${data.sheet_url}" target="_blank" style="color:var(--success)">Open Google Sheet →</a>`;
+            toast('Export successful!', 'success');
         } else {
             resultEl.className = 'export-result error';
-            resultEl.textContent = `❌ Lỗi: ${data.detail || 'Unknown error'}`;
-            toast('Export thất bại', 'error');
+            resultEl.textContent = `❌ Error: ${data.detail || 'Unknown error'}`;
+            toast('Export failed', 'error');
         }
 
     } catch (err) {
-        toast(`Lỗi kết nối: ${err.message}`, 'error');
+        toast(`Connection error: ${err.message}`, 'error');
     }
 
     btn.disabled = false;
@@ -338,7 +715,7 @@ async function loadHistory() {
         const list = $('#historyList');
 
         if (!jobs.length) {
-            list.innerHTML = '<p class="empty-state">Chưa có lịch sử quét nào</p>';
+            list.innerHTML = '<p class="empty-state">No scan history yet</p>';
             return;
         }
 
@@ -391,7 +768,7 @@ async function loadJob(jobId) {
         }
 
     } catch (err) {
-        toast('Không thể tải job', 'error');
+        toast('Unable to load job', 'error');
     }
 }
 
@@ -405,10 +782,10 @@ function showStatusPanel(platformCount) {
     // Reset
     $('#progressFill').style.width = '5%';
     $('#progressFill').style.background = '';
-    $('#progressText').textContent = 'Đang khởi tạo...';
+    $('#progressText').textContent = 'Initializing...';
     $('#statusIcon').textContent = '⏳';
-    $('#statusTitle').textContent = 'Đang quét...';
-    $('#statusSubtitle').textContent = 'Hệ thống đang tìm kiếm ứng viên trên các nền tảng';
+    $('#statusTitle').textContent = 'Scanning...';
+    $('#statusSubtitle').textContent = 'The system is searching for candidates across platforms';
     $('#statCandidates').textContent = '0';
     $('#statPlatforms').textContent = platformCount;
     $('#statTime').textContent = '0s';
@@ -458,11 +835,11 @@ function toast(message, type = 'info') {
 
 async function handleDeepScan(screenName) {
     if (!screenName) {
-        toast('Không tìm thấy username để quét chuyên sâu', 'error');
+        toast('Username not found for deep scan', 'error');
         return;
     }
 
-    if (!confirm(`Bạn có muốn quét danh sách Follower của @${screenName} để tìm thêm ứng viên không?`)) {
+    if (!confirm(`Do you want to deep scan followers of @${screenName} to find more candidates?`)) {
         return;
     }
 
@@ -473,7 +850,7 @@ async function handleDeepScan(screenName) {
     };
 
     try {
-        toast('Bắt đầu quét chuyên sâu...', 'info');
+        toast('Starting deep scan...', 'info');
         const resp = await fetch(`${API}/jobs/deep-scan`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -482,7 +859,7 @@ async function handleDeepScan(screenName) {
         const data = await resp.json();
 
         if (!resp.ok) {
-            toast(data.detail || 'Lỗi tạo job chuyên sâu', 'error');
+            toast(data.detail || 'Failed to create deep scan job', 'error');
             return;
         }
 
@@ -491,11 +868,11 @@ async function handleDeepScan(screenName) {
 
         // Show status panel
         showStatusPanel(1);
-        $('#statusTitle').textContent = `Đang đào sâu kết nối của @${screenName}`;
+        $('#statusTitle').textContent = `Deep scanning connections of @${screenName}`;
         startPolling();
 
     } catch (err) {
-        toast(`Lỗi: ${err.message}`, 'error');
+        toast(`Error: ${err.message}`, 'error');
     }
 }
 
