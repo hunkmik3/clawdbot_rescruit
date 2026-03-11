@@ -97,6 +97,14 @@
           </div>
         </div>
 
+        <div class="form-group">
+          <label class="toggle-label" for="excludeHistoryToggle">
+            <input type="checkbox" id="excludeHistoryToggle" checked />
+            <span>Only new candidates (exclude previously scanned history)</span>
+          </label>
+          <span class="form-hint">Turn this off if you want to include candidates that appeared in older scans.</span>
+        </div>
+
         <button type="submit" class="btn btn-primary" id="btnSearch">
           <span class="btn-icon">🚀</span>
           Start Scan
@@ -202,13 +210,23 @@
     <!-- ── History Panel ────────────────────────────── -->
     <section class="panel history-panel" id="historyPanel">
       <div class="panel-header">
-        <h2 class="panel-title">
-          <span class="panel-icon">📜</span>
-          Scan History
-        </h2>
+        <div class="panel-header-left">
+          <h2 class="panel-title">
+            <span class="panel-icon">📜</span>
+            Scan History
+          </h2>
+        </div>
+        <div class="panel-header-right">
+          <button class="btn btn-outline btn-sm history-delete-all-btn" id="btnDeleteAllHistory" disabled>Delete All</button>
+        </div>
       </div>
       <div class="history-list" id="historyList">
         <p class="empty-state">No scan history yet</p>
+      </div>
+      <div class="history-pagination hidden" id="historyPagination">
+        <button class="btn btn-outline btn-sm" id="historyPrev">← Previous</button>
+        <span class="history-page-info" id="historyPageInfo">Page 1 / 1</span>
+        <button class="btn btn-outline btn-sm" id="historyNext">Next →</button>
       </div>
     </section>
   </main>
@@ -216,7 +234,7 @@
   <!-- ─── Toast notification ────────────────────────── -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <script src="/static/app.js?v=20260311-en-ui"></script>
+  <script src="/static/app.js?v=20260311-history-delete-toggle"></script>
 </body>
 
 </html>

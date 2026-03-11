@@ -225,6 +225,25 @@ body {
   color: var(--text-muted);
 }
 
+.toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: none;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+}
+
+.toggle-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -839,6 +858,15 @@ input::placeholder {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.history-item-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .history-status {
@@ -898,11 +926,91 @@ input::placeholder {
   color: var(--accent);
 }
 
+.history-delete-all-btn {
+  min-width: 120px;
+}
+
+.history-delete-all-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.history-delete-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.history-delete-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(102, 254, 102, 0.12);
+}
+
+.history-pagination {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.history-page-info {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  text-align: center;
+  min-width: 110px;
+}
+
+.history-pagination .btn {
+  min-width: 112px;
+}
+
+.history-pagination .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-color: var(--border);
+  color: var(--text-muted);
+  background: transparent;
+}
+
+.history-pagination .btn:disabled:hover {
+  border-color: var(--border);
+  background: transparent;
+}
+
 .empty-state {
   text-align: center;
   padding: 24px;
   color: var(--text-muted);
   font-size: 14px;
+}
+
+@media (max-width: 640px) {
+  .history-pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .history-pagination .btn {
+    flex: 1 1 140px;
+  }
+
+  .history-page-info {
+    order: -1;
+    width: 100%;
+  }
 }
 
 /* ── Toast ──────────────────────────────────────── */

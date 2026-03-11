@@ -8,6 +8,7 @@ class JobCreateRequest(BaseModel):
     platforms: list[str] = Field(default_factory=lambda: ["artstation"])
     location: str | None = None
     max_items_per_platform: int = 20
+    exclude_previously_scanned: bool = True
     actor_overrides: dict[str, str] = Field(
         default_factory=dict,
         description="Optional mapping platform -> Apify actor id, used to override default actors",

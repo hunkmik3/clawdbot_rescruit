@@ -11,18 +11,46 @@ from typing import Any
 from app.models.schemas import Candidate
 from app.services.apify_client import ApifyClient
 from app.services.cross_platform import enrich_candidates_cross_platform
-from app.services.job_store import load_job, save_job, update_job_status
+from app.services.job_store import (
+    list_job_records,
+    load_job,
+    save_job,
+    update_job_status,
+)
 from app.services.normalize import normalize_candidate
+
+HISTORICAL_FETCH_MULTIPLIER = 3
+HISTORICAL_FETCH_MAX_ITEMS = 300
 
 
 # ── Actor-input builders ─────────────────────────────────────────────────
+
+
+def _safe_max_items(raw_value: Any, *, default: int = 20) -> int:
+    try:
+        value = int(raw_value)
+    except (TypeError, ValueError):
+        value = default
+    return max(1, value)
+
+
+def _get_requested_max_items(job_request: dict[str, Any]) -> int:
+    return _safe_max_items(job_request.get("max_items_per_platform", 20), default=20)
+
+
+def _get_effective_max_items(job_request: dict[str, Any]) -> int:
+    requested = _get_requested_max_items(job_request)
+    return _safe_max_items(
+        job_request.get("effective_max_items_per_platform", requested),
+        default=requested,
+    )
 
 
 def _build_artstation_input(job_request: dict[str, Any]) -> dict[str, Any]:
     """Build input for contacts-api/artstation-email-scraper-fast-advanced-and-cheapest."""
     keywords = job_request.get("keywords", [])
     location = job_request.get("location")
-    max_items = int(job_request.get("max_items_per_platform", 20))
+    max_items = _get_effective_max_items(job_request)
 
     actor_input: dict[str, Any] = {
         "keywords": keywords,
@@ -50,7 +78,7 @@ def _build_linkedin_input(job_request: dict[str, Any]) -> dict[str, Any]:
     """
     keywords = job_request.get("keywords", [])
     location = job_request.get("location")
-    max_items = int(job_request.get("max_items_per_platform", 20))
+    max_items = _get_effective_max_items(job_request)
 
     search_query = " ".join(keywords) if keywords else ""
 
@@ -78,7 +106,7 @@ def _build_instagram_input(job_request: dict[str, Any]) -> dict[str, Any]:
     """
     keywords = job_request.get("keywords", [])
     location = job_request.get("location", "")
-    max_items = int(job_request.get("max_items_per_platform", 20))
+    max_items = _get_effective_max_items(job_request)
 
     # Combine keywords and location
     search_parts = keywords.copy()
@@ -101,7 +129,7 @@ def _build_x_input(job_request: dict[str, Any]) -> dict[str, Any]:
     """
     keywords = job_request.get("keywords", [])
     location = job_request.get("location", "")
-    max_items = int(job_request.get("max_items_per_platform", 20))
+    max_items = _get_effective_max_items(job_request)
 
     # Combine keywords + location into user search queries
     search_queries = []
@@ -124,7 +152,7 @@ def _build_generic_input(job_request: dict[str, Any], platform: str) -> dict[str
     """Build a generic Apify actor input."""
     keywords = job_request.get("keywords", [])
     location = job_request.get("location")
-    max_items = int(job_request.get("max_items_per_platform", 20))
+    max_items = _get_effective_max_items(job_request)
 
     actor_input: dict[str, Any] = {
         "searchTerms": keywords,
@@ -176,6 +204,34 @@ def run_job(job_id: str) -> None:
     import logging
     logger = logging.getLogger(__name__)
 
+    requested_max_items = _get_requested_max_items(request)
+    exclude_previously_scanned = bool(request.get("exclude_previously_scanned", True))
+    historical_candidate_keys: set[str] = set()
+    effective_max_items = requested_max_items
+    if exclude_previously_scanned:
+        historical_candidate_keys = _load_historical_candidate_keys(job_id, request)
+        if historical_candidate_keys:
+            effective_max_items = min(
+                HISTORICAL_FETCH_MAX_ITEMS,
+                requested_max_items * HISTORICAL_FETCH_MULTIPLIER,
+            )
+    runtime_request = dict(request)
+    runtime_request["effective_max_items_per_platform"] = effective_max_items
+    outputs["historical_seed"] = {
+        "enabled": exclude_previously_scanned,
+        "existing_candidates": len(historical_candidate_keys),
+        "requested_max_items_per_platform": requested_max_items,
+        "effective_max_items_per_platform": effective_max_items,
+    }
+    if exclude_previously_scanned and effective_max_items > requested_max_items:
+        logger.info(
+            "[Pipeline] Historical dedup detected %s existing candidates. "
+            "Increasing fetch window from %s to %s per platform.",
+            len(historical_candidate_keys),
+            requested_max_items,
+            effective_max_items,
+        )
+
     for platform in platforms:
         platform_lower = platform.lower()
         items: list[dict] = []
@@ -185,18 +241,18 @@ def run_job(job_id: str) -> None:
             if platform_lower == "artstation":
                 from app.services.artstation_scraper import scrape_artstation
                 items = scrape_artstation(
-                    keywords=request.get("keywords", []),
-                    location=request.get("location", ""),
-                    max_items=int(request.get("max_items_per_platform", 20)),
+                    keywords=runtime_request.get("keywords", []),
+                    location=runtime_request.get("location", ""),
+                    max_items=_get_effective_max_items(runtime_request),
                 )
             # ── Twitter/X: use free scraper + Auto Deep Scan ──
             elif platform_lower == "x":
                 from app.services.twitter_scraper import scrape_twitter, scrape_twitter_connections
 
                 items = scrape_twitter(
-                    keywords=request.get("keywords", []),
-                    location=request.get("location", ""),
-                    max_items=int(request.get("max_items_per_platform", 20)),
+                    keywords=runtime_request.get("keywords", []),
+                    location=runtime_request.get("location", ""),
+                    max_items=_get_effective_max_items(runtime_request),
                 )
 
                 # ── AUTO DEEP SCAN ──
@@ -239,7 +295,7 @@ def run_job(job_id: str) -> None:
 
                         # Lọc connections theo keywords gốc - linh hoạt hơn
                         # VD: "2D animator" → match "2d", "animator", "animation", "animate"
-                        raw_keywords = request.get("keywords", [])
+                        raw_keywords = runtime_request.get("keywords", [])
                         keywords_lower = []
                         for kw in raw_keywords:
                             keywords_lower.append(kw.lower())  # full phrase
@@ -278,7 +334,7 @@ def run_job(job_id: str) -> None:
 
             else:
                 # ── Other platforms: use Apify ──
-                actor_input = _build_actor_input(request, platform_lower)
+                actor_input = _build_actor_input(runtime_request, platform_lower)
                 items = client.run_actor_and_fetch_items(
                     platform=platform_lower,
                     actor_input=actor_input,
@@ -309,15 +365,40 @@ def run_job(job_id: str) -> None:
         enriched, enrichment_stats = enrich_candidates_cross_platform(
             deduped, platforms
         )
+
+        fresh_candidates = enriched
+        removed_historical = 0
+        if exclude_previously_scanned:
+            fresh_candidates, removed_historical = _exclude_candidates_seen_before(
+                enriched, historical_candidate_keys
+            )
+
+        trimmed_to_request = 0
+        if (
+            exclude_previously_scanned
+            and historical_candidate_keys
+            and effective_max_items > requested_max_items
+        ):
+            max_total = requested_max_items * max(len(platforms), 1)
+            if len(fresh_candidates) > max_total:
+                trimmed_to_request = len(fresh_candidates) - max_total
+                fresh_candidates = fresh_candidates[:max_total]
+
         if enrichment_stats["total_enriched"] > 0:
             outputs["cross_platform_enrichment"] = enrichment_stats
             logger.info(
                 f"[Pipeline] Cross-platform enrichment: "
                 f"{enrichment_stats['total_enriched']} candidates enriched"
             )
+        if exclude_previously_scanned and (removed_historical > 0 or trimmed_to_request > 0):
+            outputs["historical_dedup"] = {
+                "removed_existing_candidates": removed_historical,
+                "trimmed_after_backfill": trimmed_to_request,
+                "final_candidates": len(fresh_candidates),
+            }
 
         data["outputs"] = outputs
-        data["candidates"] = [candidate.model_dump() for candidate in enriched]
+        data["candidates"] = [candidate.model_dump() for candidate in fresh_candidates]
         data["status"] = "succeeded"
         data["error"] = None
         save_job(job_id, data)
@@ -329,22 +410,133 @@ def run_job(job_id: str) -> None:
 
 
 
+def _normalize_identity(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().lower()
+    if not normalized:
+        return None
+    return normalized.rstrip("/")
+
+
+def _candidate_identity_key(candidate: Candidate) -> str | None:
+    for value in (
+        candidate.source_url,
+        candidate.linkedin_url,
+        candidate.artstation_url,
+        candidate.x_url,
+        candidate.instagram_url,
+        candidate.behance_url,
+        candidate.portfolio_url,
+    ):
+        normalized = _normalize_identity(value)
+        if normalized:
+            return f"url:{normalized}"
+
+    name = _normalize_identity(candidate.full_name)
+    platform = _normalize_identity(candidate.source_platform)
+    if name and platform:
+        return f"name:{name}|platform:{platform}"
+    if name:
+        return f"name:{name}"
+    return None
+
+
+def _candidate_identity_key_from_raw(raw_candidate: dict[str, Any]) -> str | None:
+    for field in (
+        "source_url",
+        "linkedin_url",
+        "artstation_url",
+        "x_url",
+        "instagram_url",
+        "behance_url",
+        "portfolio_url",
+    ):
+        normalized = _normalize_identity(raw_candidate.get(field))
+        if normalized:
+            return f"url:{normalized}"
+
+    name = _normalize_identity(raw_candidate.get("full_name"))
+    platform = _normalize_identity(raw_candidate.get("source_platform"))
+    if name and platform:
+        return f"name:{name}|platform:{platform}"
+    if name:
+        return f"name:{name}"
+    return None
+
+
+def _request_signature(request_payload: dict[str, Any]) -> tuple[tuple[str, ...], str]:
+    raw_keywords = request_payload.get("keywords") or []
+    keywords = tuple(
+        sorted(
+            {
+                keyword.strip().lower()
+                for keyword in raw_keywords
+                if isinstance(keyword, str) and keyword.strip()
+            }
+        )
+    )
+    location = _normalize_identity(request_payload.get("location")) or ""
+    return keywords, location
+
+
+def _load_historical_candidate_keys(
+    current_job_id: str, current_request: dict[str, Any]
+) -> set[str]:
+    seen_keys: set[str] = set()
+    current_signature = _request_signature(current_request)
+
+    for record in list_job_records():
+        if record.get("job_id") == current_job_id:
+            continue
+        if record.get("status") != "succeeded":
+            continue
+        if _request_signature(record.get("request") or {}) != current_signature:
+            continue
+
+        for raw_candidate in record.get("candidates", []):
+            if not isinstance(raw_candidate, dict):
+                continue
+            key = _candidate_identity_key_from_raw(raw_candidate)
+            if key:
+                seen_keys.add(key)
+    return seen_keys
+
+
+def _exclude_candidates_seen_before(
+    candidates: list[Candidate], historical_keys: set[str]
+) -> tuple[list[Candidate], int]:
+    if not historical_keys:
+        return candidates, 0
+
+    filtered: list[Candidate] = []
+    removed = 0
+    seen_keys = set(historical_keys)
+
+    for candidate in candidates:
+        key = _candidate_identity_key(candidate)
+        if key and key in seen_keys:
+            removed += 1
+            continue
+
+        filtered.append(candidate)
+        if key:
+            seen_keys.add(key)
+
+    return filtered, removed
+
+
 def _dedupe_candidates(candidates: list[Candidate]) -> list[Candidate]:
-    """Remove duplicate candidates based on URL or name+platform."""
+    """Remove duplicate candidates within the same job."""
     seen: set[str] = set()
     deduped: list[Candidate] = []
 
     for candidate in candidates:
-        key = (
-            candidate.source_url
-            or candidate.linkedin_url
-            or candidate.artstation_url
-            or candidate.portfolio_url
-            or (candidate.full_name or "") + "|" + (candidate.source_platform or "")
-        )
-        if key in seen:
-            continue
-        seen.add(key)
+        key = _candidate_identity_key(candidate)
+        if key:
+            if key in seen:
+                continue
+            seen.add(key)
         deduped.append(candidate)
 
     return deduped

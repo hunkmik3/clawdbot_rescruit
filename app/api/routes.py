@@ -3,9 +3,10 @@ from uuid import uuid4
 from fastapi import APIRouter
 from fastapi import BackgroundTasks
 from fastapi import HTTPException
+from fastapi import Response
 
 from app.models.schemas import JobCreateRequest, JobCreateResponse, JobStatusResponse
-from app.services.job_store import create_job, list_jobs, load_job
+from app.services.job_store import create_job, delete_all_jobs, delete_job, list_jobs, load_job
 from app.services.pipeline import run_job
 from app.services.google_sheets import export_to_google_sheets
 from pydantic import BaseModel
@@ -38,6 +39,21 @@ def create_job_endpoint(payload: JobCreateRequest, background_tasks: BackgroundT
 @router.get("/jobs")
 def list_jobs_endpoint() -> list[dict]:
     return list_jobs()
+
+
+@router.delete("/jobs")
+def delete_all_jobs_endpoint() -> dict[str, int]:
+    deleted_count = delete_all_jobs()
+    return {"deleted_count": deleted_count}
+
+
+@router.delete("/jobs/{job_id}", status_code=204)
+def delete_job_endpoint(job_id: str) -> Response:
+    try:
+        delete_job(job_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return Response(status_code=204)
 
 
 @router.get("/jobs/{job_id}", response_model=JobStatusResponse)

@@ -9,6 +9,9 @@ let currentJobId = null;
 let pollTimer = null;
 let startTime = null;
 let candidates = [];
+let historyJobs = [];
+let historyPage = 1;
+const HISTORY_PAGE_SIZE = 7;
 const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig;
 const EMAIL_BLOCKLIST_PREFIXES = ['noreply@', 'no-reply@', 'donotreply@', 'example@', 'test@'];
 const CROSS_PLATFORM_LABELS = {
@@ -247,6 +250,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // View toggle
     $('#viewTable').addEventListener('click', () => setView('table'));
     $('#viewCards').addEventListener('click', () => setView('cards'));
+
+    // History pagination
+    const historyPrev = $('#historyPrev');
+    const historyNext = $('#historyNext');
+    if (historyPrev) historyPrev.addEventListener('click', handleHistoryPrevPage);
+    if (historyNext) historyNext.addEventListener('click', handleHistoryNextPage);
+
+    const deleteAllHistoryBtn = $('#btnDeleteAllHistory');
+    if (deleteAllHistoryBtn) deleteAllHistoryBtn.addEventListener('click', handleDeleteAllHistory);
 });
 
 function initCountrySelector() {
@@ -287,6 +299,7 @@ async function handleSearch(e) {
         platforms,
         location: location || undefined,
         max_items_per_platform: maxItems,
+        exclude_previously_scanned: Boolean($('#excludeHistoryToggle')?.checked),
     };
 
     // Disable button
@@ -707,30 +720,38 @@ async function handleExport() {
 
 
 // ═══ History ═══════════════════════════════════════
-async function loadHistory() {
-    try {
-        const resp = await fetch(`${API}/jobs`);
-        const jobs = await resp.json();
+function renderHistoryPage() {
+    const list = $('#historyList');
+    const pagination = $('#historyPagination');
+    const prevBtn = $('#historyPrev');
+    const nextBtn = $('#historyNext');
+    const pageInfo = $('#historyPageInfo');
+    const deleteAllBtn = $('#btnDeleteAllHistory');
 
-        const list = $('#historyList');
+    if (!list) return;
 
-        if (!jobs.length) {
-            list.innerHTML = '<p class="empty-state">No scan history yet</p>';
-            return;
-        }
+    if (!historyJobs.length) {
+        list.innerHTML = '<p class="empty-state">No scan history yet</p>';
+        if (pagination) pagination.classList.add('hidden');
+        if (deleteAllBtn) deleteAllBtn.disabled = true;
+        return;
+    }
 
-        // Sort by most recent
-        jobs.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+    const totalPages = Math.max(1, Math.ceil(historyJobs.length / HISTORY_PAGE_SIZE));
+    historyPage = Math.min(Math.max(historyPage, 1), totalPages);
 
-        list.innerHTML = jobs.slice(0, 10).map(job => {
-            const req = job.request || {};
-            const keywords = (req.keywords || []).join(', ') || 'N/A';
-            const location = req.location || '';
-            const platforms = (req.platforms || []).join(', ');
-            const count = job.candidate_count || 0;
-            const status = job.status || 'unknown';
+    const start = (historyPage - 1) * HISTORY_PAGE_SIZE;
+    const visibleJobs = historyJobs.slice(start, start + HISTORY_PAGE_SIZE);
 
-            return `
+    list.innerHTML = visibleJobs.map(job => {
+        const req = job.request || {};
+        const keywords = (req.keywords || []).join(', ') || 'N/A';
+        const location = req.location || '';
+        const platforms = (req.platforms || []).join(', ');
+        const count = job.candidate_count || 0;
+        const status = job.status || 'unknown';
+
+        return `
         <div class="history-item" onclick="loadJob('${job.job_id}')">
           <div class="history-item-left">
             <div class="history-status ${status}"></div>
@@ -739,13 +760,149 @@ async function loadHistory() {
               <span class="history-detail">${esc(platforms)} • ${status}</span>
             </div>
           </div>
-          <span class="history-count">${count} 👤</span>
+          <div class="history-item-right">
+            <span class="history-count">${count} 👤</span>
+            <button
+              type="button"
+              class="history-delete-btn"
+              title="Delete this scan history"
+              onclick="deleteHistoryJob(event, '${job.job_id}')"
+            >
+              ×
+            </button>
+          </div>
         </div>
       `;
-        }).join('');
+    }).join('');
+
+    if (deleteAllBtn) deleteAllBtn.disabled = false;
+
+    if (pagination) {
+        if (totalPages > 1) {
+            pagination.classList.remove('hidden');
+        } else {
+            pagination.classList.add('hidden');
+        }
+    }
+
+    if (pageInfo) {
+        pageInfo.textContent = `Page ${historyPage} / ${totalPages}`;
+    }
+    if (prevBtn) {
+        prevBtn.disabled = historyPage <= 1;
+    }
+    if (nextBtn) {
+        nextBtn.disabled = historyPage >= totalPages;
+    }
+}
+
+function handleHistoryPrevPage() {
+    if (historyPage <= 1) return;
+    historyPage -= 1;
+    renderHistoryPage();
+}
+
+function handleHistoryNextPage() {
+    const totalPages = Math.max(1, Math.ceil(historyJobs.length / HISTORY_PAGE_SIZE));
+    if (historyPage >= totalPages) return;
+    historyPage += 1;
+    renderHistoryPage();
+}
+
+async function loadHistory(options = {}) {
+    const shouldResetPage = options.resetPage !== false;
+    try {
+        const resp = await fetch(`${API}/jobs`);
+        if (!resp.ok) {
+            throw new Error(`History request failed (${resp.status})`);
+        }
+        const jobs = await resp.json();
+
+        // Sort by most recent
+        historyJobs = Array.isArray(jobs) ? jobs : [];
+        historyJobs.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+        if (shouldResetPage) historyPage = 1;
+        renderHistoryPage();
 
     } catch (err) {
+        historyJobs = [];
+        historyPage = 1;
+        renderHistoryPage();
         console.error('History error:', err);
+    }
+}
+
+async function deleteHistoryJob(event, jobId) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    if (!jobId) return;
+
+    if (!confirm('Delete this scan history item?')) {
+        return;
+    }
+
+    try {
+        const resp = await fetch(`${API}/jobs/${jobId}`, { method: 'DELETE' });
+        if (!resp.ok) {
+            let detail = `Delete failed (${resp.status})`;
+            try {
+                const data = await resp.json();
+                detail = data.detail || detail;
+            } catch (_) {
+                // Ignore body parse failure.
+            }
+            toast(detail, 'error');
+            return;
+        }
+
+        if (currentJobId === jobId) {
+            stopPolling();
+            currentJobId = null;
+            searchPanel.classList.remove('hidden');
+            statusPanel.classList.add('hidden');
+            resultsPanel.classList.add('hidden');
+        }
+
+        await loadHistory({ resetPage: false });
+        toast('History item deleted', 'success');
+    } catch (err) {
+        toast(`Delete failed: ${err.message}`, 'error');
+    }
+}
+
+async function handleDeleteAllHistory() {
+    if (!confirm('Delete all scan history? This cannot be undone.')) {
+        return;
+    }
+
+    const btn = $('#btnDeleteAllHistory');
+    if (btn) btn.disabled = true;
+
+    try {
+        const resp = await fetch(`${API}/jobs`, { method: 'DELETE' });
+        const data = await resp.json().catch(() => ({}));
+
+        if (!resp.ok) {
+            toast(data.detail || `Delete failed (${resp.status})`, 'error');
+            return;
+        }
+
+        stopPolling();
+        currentJobId = null;
+        candidates = [];
+        searchPanel.classList.remove('hidden');
+        statusPanel.classList.add('hidden');
+        resultsPanel.classList.add('hidden');
+        $('#exportResult').classList.add('hidden');
+
+        await loadHistory();
+        toast(`Deleted ${data.deleted_count || 0} history item(s)`, 'success');
+    } catch (err) {
+        toast(`Delete failed: ${err.message}`, 'error');
+    } finally {
+        if (btn) btn.disabled = historyJobs.length === 0;
     }
 }
 
